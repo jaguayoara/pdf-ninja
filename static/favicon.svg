@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Pdf Ninja">
+  <defs>
+    <!-- Fondo negro con leve gradiente -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1A1A22"/>
+      <stop offset="100%" stop-color="#07070B"/>
+    </linearGradient>
+    <!-- Cinta ninja roja -->
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7F1D1D"/>
+      <stop offset="45%" stop-color="#DC2626"/>
+      <stop offset="55%" stop-color="#EF4444"/>
+      <stop offset="100%" stop-color="#7F1D1D"/>
+    </linearGradient>
+    <!-- Highlight sutil en la N -->
+    <linearGradient id="ngrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E2E8F0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Cuadrado redondeado negro -->
+  <rect x="0" y="0" width="256" height="256" rx="48" ry="48" fill="url(#bg)"/>
+
+  <!-- Sombra diagonal sutil -->
+  <path d="M 0 200 L 200 0 L 256 0 L 256 30 L 30 256 L 0 256 Z" fill="#000000" opacity="0.35"/>
+
+  <!-- CINTA NINJA diagonal (atraviesa de esquina superior derecha a inferior izquierda) -->
+  <path d="M 28 196 L 196 28 L 228 60 L 60 228 Z" fill="url(#blade)"/>
+  <!-- Brillo sobre la cinta -->
+  <path d="M 28 196 L 196 28 L 210 42 L 42 210 Z" fill="#FFFFFF" opacity="0.18"/>
+
+  <!-- Letra "N" geometrica (dos postes + diagonal) -->
+  <!-- Poste izquierdo -->
+  <rect x="62" y="68" width="28" height="120" fill="url(#ngrad)"/>
+  <!-- Poste derecho -->
+  <rect x="166" y="68" width="28" height="120" fill="url(#ngrad)"/>
+  <!-- Diagonal de la N -->
+  <polygon points="90,68 118,68 194,188 166,188" fill="url(#ngrad)"/>
+</svg>

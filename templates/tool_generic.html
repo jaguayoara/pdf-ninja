@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Herramienta{% endblock %}
+{% block content %}
+
+<div class="tool-page" data-slug="{{ slug }}">
+  <a class="back" href="{{ url_for('index') }}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+    Volver al inicio
+  </a>
+  <h1 class="tool-title">
+    <span class="tool-emoji" aria-hidden="true">{{ icon or "📄" }}</span>
+    {{ title }}
+  </h1>
+  <p class="tool-lead">{{ description }}</p>
+
+  <div class="tool-layout">
+    <section class="drop-pane">
+      <div id="dropZone" class="drop-zone" tabindex="0" role="button" aria-label="Arrastra o selecciona archivo">
+        <input type="file" id="fileInput" multiple="{{ 'true' if multiple else 'false' }}" accept="{{ accept }}" hidden />
+        <div class="drop-illustration" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 16v-2a4 4 0 0 1 4-4h12l8 8v22a4 4 0 0 1-4 4H20a4 4 0 0 1-4-4v-2" transform="translate(4 6)"/>
+            <path d="M44 18v-6a2 2 0 0 0-2-2h-6" transform="translate(4 6)"/>
+            <path d="M32 30v14" />
+            <path d="m27 35 5-5 5 5" />
+          </svg>
+        </div>
+        <div class="drop-title">{{ drop_title or "Arrastra tu archivo aquí" }}</div>
+        <div class="drop-sub">{{ drop_sub or 'o haz clic para seleccionar' }}</div>
+        <button type="button" class="btn btn-primary" id="browseBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+          Seleccionar archivo
+        </button>
+        <div class="drop-hint" id="dropHint">{{ hint or "" }}</div>
+      </div>
+
+      <div id="fileList" class="file-list" hidden></div>
+    </section>
+
+    {% if options %}
+    <aside class="options-pane">
+      <h3>Opciones</h3>
+      {{ options|safe }}
+    </aside>
+    {% endif %}
+  </div>
+
+  <div class="action-bar">
+    <button type="button" id="actionBtn" class="btn btn-primary btn-lg" disabled>
+      <span id="actionBtnLabel">{{ action_label or "Procesar" }}</span>
+    </button>
+    <span class="action-status" id="actionStatus"></span>
+  </div>
+
+  <div class="result-pane" id="resultPane" hidden>
+    <h3>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+      Listo
+    </h3>
+    <div id="resultBody"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.TOOL_CONFIG = {
+    slug: {{ slug|tojson }},
+    endpoint: {{ endpoint|tojson }},
+    title: {{ title|tojson }},
+    multiple: {{ 'true' if multiple else 'false' }},
+    fileTypes: {{ (file_types or 'pdf')|tojson }},
+    extraFields: {{ (extra_fields or [])|tojson }},
+  };
+</script>
+<script src="{{ url_for('static', filename='js/tools.js') }}"></script>
+{% endblock %}

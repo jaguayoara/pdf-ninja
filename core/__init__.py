@@ -1,0 +1,1 @@
+﻿"""Pdf Ninja core package."""
