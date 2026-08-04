@@ -1,0 +1,65 @@
+name: Build Windows
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:        # permite ejecutar el build manualmente desde la web
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller==6.10.0
+
+      - name: Build with PyInstaller
+        run: |
+          python -m PyInstaller --noconfirm --clean PdfNinja.spec
+
+      - name: Verify build
+        run: |
+          if (Test-Path 'dist\PdfNinja\PdfNinja.exe') {
+            Write-Host "Build OK: $((Get-Item 'dist\PdfNinja\PdfNinja.exe').Length / 1MB) MB"
+          } else {
+            Write-Error "PdfNinja.exe no se genero"
+            exit 1
+          }
+
+      - name: Zip the bundle
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'dist\PdfNinja' -DestinationPath 'PdfNinja-windows.zip'
+          Write-Host "Zip: $((Get-Item 'PdfNinja-windows.zip').Length / 1MB) MB"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PdfNinja-windows
+          path: PdfNinja-windows.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create release (only on tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PdfNinja-windows.zip
+          draft: false
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
