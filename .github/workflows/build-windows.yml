@@ -1,0 +1,116 @@
+name: Build PDF Ninja
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: PdfNinja-windows
+            dist_subdir: dist\PdfNinja
+            zip_name: PdfNinja-windows.zip
+            binary_name: PdfNinja.exe
+          - os: macos-latest
+            artifact: PdfNinja-macos
+            dist_subdir: dist/PdfNinja
+            zip_name: PdfNinja-macos.zip
+            binary_name: PdfNinja
+          - os: ubuntu-latest
+            artifact: PdfNinja-linux
+            dist_subdir: dist/PdfNinja
+            zip_name: PdfNinja-linux.zip
+            binary_name: PdfNinja
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Linux system deps (WebKitGTK para pywebview)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-0 python3-gi gir1.2-webkit2-4.1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller==6.10.0
+
+      - name: Build with PyInstaller
+        run: |
+          python -m PyInstaller --noconfirm --clean PdfNinja.spec
+
+      - name: Mark Linux/macOS binary as executable
+        if: matrix.os != 'windows-latest'
+        run: |
+          chmod +x "${{ matrix.dist_subdir }}/${{ matrix.binary_name }}"
+
+      - name: Verify build
+        shell: pwsh
+        run: |
+          $bin = Join-Path '${{ matrix.dist_subdir }}' '${{ matrix.binary_name }}'
+          if (Test-Path $bin) {
+            $size = [math]::Round((Get-Item $bin).Length / 1MB, 1)
+            Write-Host "Build OK (${{ matrix.os }}): $size MB -> $bin"
+          } else {
+            Write-Error "No se genero $bin"
+            exit 1
+          }
+
+      - name: Zip the bundle
+        shell: pwsh
+        run: |
+          Compress-Archive -Path '${{ matrix.dist_subdir }}' -DestinationPath '${{ matrix.zip_name }}' -Force
+          $z = Get-Item '${{ matrix.zip_name }}'
+          Write-Host "Zip: $([math]::Round($z.Length / 1MB, 1)) MB"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.zip_name }}
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create release (only on tag push)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/PdfNinja-windows/PdfNinja-windows.zip
+            artifacts/PdfNinja-macos/PdfNinja-macos.zip
+            artifacts/PdfNinja-linux/PdfNinja-linux.zip
+          draft: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
