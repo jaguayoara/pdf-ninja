@@ -56,36 +56,36 @@
 
 PDF Ninja se puede usar de **tres formas**, segun tus necesidades:
 
-### 1. Programa portable (`.exe`) — recomendado
+### 1. Programa portable — recomendado para usuarios finales
 
 No necesita Python instalado. Descarga, descomprime, doble clic.
 
-1. Ejecuta `build.bat` una vez (genera `dist\PdfNinja\PdfNinja.exe`).
-2. Comprime la carpeta `dist\PdfNinja\` en un `.zip` para distribuir.
-3. Los usuarios finales solo descomprimen y hacen **doble clic en `PdfNinja.exe`**.
+- **Windows**: descarga el `.zip` desde [Releases](https://github.com/jaguayoara/pdf-ninja/releases), descomprime y abre `PdfNinja.exe`. Doble clic y listo.
+- **macOS / Linux**: compilar desde codigo fuente con `build.sh` (ver [Compilar el binario portable](#compilar-el-binario-portable)).
 
-Para ejecutarlo desde el proyecto ya compilado, usa **`PdfNinja.bat`** (atajo a `dist\PdfNinja\PdfNinja.exe`).
-
-**Requisitos del sistema final:** Windows 10/11 con **WebView2 Runtime** (ya viene preinstalado en Windows 10 22H2+ y Windows 11).
+**Requisitos del sistema final:**
+- Windows 10/11 con **WebView2 Runtime** (ya viene preinstalado en Windows 10 22H2+ y Windows 11)
+- macOS 11+ con WebKit (nativo)
+- Linux con `webkit2gtk-4.0` o `webkit2gtk-4.1` (ver seccion Linux)
 
 **Tamano aproximado del paquete:** ~270 MB (onedir, sin optimizacion adicional).
 
 ### 2. Modo escritorio (ventana nativa) — desarrollo
 
-Misma experiencia que el `.exe` pero sin empaquetar. Requiere Python.
+Misma experiencia que el binario portable pero sin empaquetar. Requiere Python 3.10+.
 
-```powershell
+```bash
 pip install -r requirements.txt
 python desktop.py
 ```
 
-Se abre una **ventana nativa maximizada** usando el webview del sistema (Edge WebView2 en Windows, WebKit en macOS, WebKitGTK en Linux). Flask corre internamente en un thread en background.
+Se abre una **ventana nativa maximizada** usando el webview del sistema (Edge WebView2 en Windows, WKWebView en macOS, WebKitGTK en Linux). Flask corre internamente en un thread en background.
 
 ### 3. Modo navegador (web clasica)
 
-Para entornos donde la ventana nativa no es ideal (servidores, WSL, etc.).
+Para entornos donde la ventana nativa no es ideal (servidores, WSL, SSH, etc.).
 
-```powershell
+```bash
 pip install -r requirements.txt
 python app.py
 ```
@@ -94,20 +94,23 @@ Y abre `http://127.0.0.1:5050` en tu navegador.
 
 ### Script de inicio automatico
 
-`start.bat` detecta automaticamente el modo:
-- Si `pywebview` esta instalado → abre ventana nativa.
+- Windows: doble clic en `start.bat`
+- macOS / Linux: `bash start.sh` (o `chmod +x start.sh && ./start.sh`)
+
+El script detecta automaticamente el modo:
+- Si `pywebview` esta instalado y el sistema lo soporta → abre ventana nativa.
 - Si no → abre en el navegador.
 
-## Instalacion
+## Instalacion por plataforma
 
-### Opcion 1: doble clic (Windows, modo desarrollo)
+### Windows (10/11)
 
+**Opcion 1: doble clic**
 1. Descarga o clona el proyecto.
 2. Haz **doble clic** en `start.bat`.
 3. La primera vez instalara las dependencias y luego abrira la app.
 
-### Opcion 2: linea de comandos
-
+**Opcion 2: PowerShell**
 ```powershell
 git clone https://github.com/jaguayoara/pdf-ninja.git
 cd pdf-ninja
@@ -117,7 +120,73 @@ python app.py
 
 Luego abre `http://127.0.0.1:5050` en tu navegador.
 
-## Compilar el `.exe` portable
+**Nota:** requiere **Python 3.10+** desde [python.org](https://www.python.org/downloads/windows/) o Microsoft Store. Marcá "Add Python to PATH" al instalar.
+
+### macOS (11 Big Sur o superior)
+
+**Opcion 1: Homebrew (recomendado)**
+```bash
+brew install python3 git
+git clone https://github.com/jaguayoara/pdf-ninja.git
+cd pdf-ninja
+python3 -m pip install -r requirements.txt
+python3 app.py
+```
+
+**Opcion 2: instalador oficial**
+1. Instala Python 3.10+ desde [python.org/downloads/macos](https://www.python.org/downloads/macos/).
+2. `git clone https://github.com/jaguayoara/pdf-ninja.git && cd pdf-ninja`
+3. `python3 -m pip install -r requirements.txt`
+4. `python3 app.py` (o `bash start.sh` para auto-detectar modo nativo)
+
+**Para ventana nativa (`desktop.py`):** pywebview usa WKWebView que viene con macOS, no necesitas instalar nada extra.
+
+**Compatibilidad:** Apple Silicon (M1/M2/M3) y Intel. Si tienes errores con `python3`, proba `python3.11` o `python3.12` explicitamente.
+
+### Linux (Ubuntu / Debian / Fedora / Arch)
+
+**Ubuntu / Debian:**
+```bash
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv git libwebkit2gtk-4.1-0
+git clone https://github.com/jaguayoara/pdf-ninja.git
+cd pdf-ninja
+python3 -m pip install -r requirements.txt
+python3 app.py
+```
+
+**Fedora:**
+```bash
+sudo dnf install -y python3 python3-pip git webkit2gtk4.1
+git clone https://github.com/jaguayoara/pdf-ninja.git
+cd pdf-ninja
+python3 -m pip install -r requirements.txt
+python3 app.py
+```
+
+**Arch / Manjaro:**
+```bash
+sudo pacman -S python python-pip git webkit2gtk-4.1
+git clone https://github.com/jaguayoara/pdf-ninja.git
+cd pdf-ninja
+python3 -m pip install -r requirements.txt
+python3 app.py
+```
+
+**Para ventana nativa (`desktop.py`):** ademas de las dependencias de arriba, necesitás los bindings de GObject para que pywebview use WebKitGTK:
+- Debian/Ubuntu: `sudo apt install -y python3-gi gir1.2-webkit2-4.1`
+- Fedora: `sudo dnf install -y python3-gobject`
+- Arch: `sudo pacman -S python-gobject`
+
+**Sin ventana nativa:** si no podes instalar las libs de GTK, simplemente corré `python3 app.py` y usa el navegador. Todo funciona igual.
+
+**Snap / Flatpak:** tambien podes correrla en modo navegador dentro de un container sin permisos especiales, ya que todo el procesamiento es local.
+
+## Compilar el binario portable
+
+> **Importante:** los binarios son **especificos por plataforma**. Hay que compilar el `.exe` en Windows, el `.app` en macOS, y el binario en Linux desde cada sistema. No se pueden cruzar binarios entre sistemas (los modulos como PyMuPDF y pikepdf traen librerias nativas compiladas para cada OS).
+
+### Windows
 
 ```powershell
 build.bat
@@ -129,9 +198,30 @@ python -m pip install pyinstaller==6.10.0
 python -m PyInstaller --noconfirm --clean PdfNinja.spec
 ```
 
-Resultado en `dist\PdfNinja\PdfNinja.exe`.
+Resultado en `dist\PdfNinja\PdfNinja.exe`. Comprimi esa carpeta en un `.zip` para distribuir.
 
-> **Por que `onedir` y no `onefile`:** PyMuPDF, pikepdf y pdf2docx traen binarios nativos pesados. En modo `onefile`, cada arranque descomprime ~200 MB a una carpeta temporal, tardando 5-10 segundos. Con `onedir`, el `.exe` es ligero y arranca instantaneo.
+### macOS / Linux
+
+```bash
+bash build.sh
+# o: chmod +x build.sh && ./build.sh
+```
+
+Equivale a:
+```bash
+python3 -m pip install pyinstaller==6.10.0
+python3 -m PyInstaller --noconfirm --clean PdfNinja.spec
+```
+
+Resultado en `dist/PdfNinja/PdfNinja` (lanzador) + `dist/PdfNinja/_internal/` (librerias + assets). Comprimi esa carpeta en un `.tar.gz` o `.zip` para distribuir.
+
+**En macOS** podes opcionalmente envolver el binario en un `.app` con `py2app` o similar, pero el binario suelto funciona bien.
+
+### GitHub Actions (solo Windows por ahora)
+
+El repo incluye un workflow en `.github/workflows/build-windows.yml` que compila el `.exe` automaticamente cuando creas un tag. Ver [Releases](https://github.com/jaguayoara/pdf-ninja/releases) para los binarios pre-construidos.
+
+> **Por que `onedir` y no `onefile`:** PyMuPDF, pikepdf y pdf2docx traen binarios nativos pesados. En modo `onefile`, cada arranque descomprime ~200 MB a una carpeta temporal, tardando 5-10 segundos. Con `onedir`, el binario es ligero y arranca instantaneo.
 
 ## Uso
 
@@ -148,9 +238,11 @@ PDF Ninja/
 ├── app.py                  # Servidor Flask principal
 ├── desktop.py              # Lanzador ventana nativa (pywebview)
 ├── requirements.txt        # Dependencias Python
-├── start.bat               # Launcher auto (nativo o navegador)
-├── PdfNinja.bat            # Atajo al .exe ya compilado
-├── build.bat               # Empaqueta el .exe con PyInstaller
+├── start.bat               # Launcher auto en Windows
+├── start.sh                # Launcher auto en macOS / Linux
+├── PdfNinja.bat            # Atajo al .exe ya compilado (Windows)
+├── build.bat               # Empaqueta el .exe con PyInstaller (Windows)
+├── build.sh                # Empaqueta el binario con PyInstaller (macOS/Linux)
 ├── PdfNinja.spec           # Configuracion de PyInstaller
 ├── LICENSE                 # Licencia MIT
 ├── core/
