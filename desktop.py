@@ -1,5 +1,5 @@
 """
-Pdf Ninja - Lanzador desktop (ventana nativa).
+PDF Ninja - Lanzador desktop (ventana nativa).
 
 Arranca Flask en un thread en background y abre una ventana nativa
 usando el webview del sistema (Edge WebView2 en Windows, WebKit en macOS,
@@ -108,7 +108,7 @@ def main():
     try:
         port = find_free_port()
         url = f"http://127.0.0.1:{port}"
-        log.info("Pdf Ninja iniciando en %s", url)
+        log.info("PDF Ninja iniciando en %s", url)
         log.info("Log file: %s", LOG_FILE)
 
         # Crear carpetas uploads/ y outputs/ junto al .exe (en runtime, no en bundle)
@@ -125,10 +125,10 @@ def main():
             try:
                 import webview
                 webview.create_window(
-                    title="Pdf Ninja - Error",
+                    title="PDF Ninja - Error",
                     html=(
                         "<html><body style='font-family:system-ui;padding:40px;'>"
-                        "<h1>No se pudo iniciar Pdf Ninja</h1>"
+                        "<h1>No se pudo iniciar PDF Ninja</h1>"
                         f"<p>El servidor no arranco. Revisa el log en:</p>"
                         f"<pre>{LOG_FILE}</pre>"
                         "</body></html>"
@@ -151,7 +151,7 @@ def main():
             icon_path = RUNTIME_DIR / "static" / "favicon.ico"
 
         window = webview.create_window(
-            title="Pdf Ninja",
+            title="PDF Ninja",
             url=url,
             width=1280,
             height=820,
@@ -182,17 +182,17 @@ def main():
         except KeyboardInterrupt:
             pass
         finally:
-            log.info("Pdf Ninja cerrado por el usuario")
+            log.info("PDF Ninja cerrado por el usuario")
     except Exception as e:
         log.exception("Error fatal: %s", e)
         try:
             # Mostrar error en una ventana si es posible
             import webview
             webview.create_window(
-                title="Pdf Ninja - Error fatal",
+                title="PDF Ninja - Error fatal",
                 html=(
                     "<html><body style='font-family:system-ui;padding:40px;color:#b00;'>"
-                    "<h1>Error al iniciar Pdf Ninja</h1>"
+                    "<h1>Error al iniciar PDF Ninja</h1>"
                     f"<pre>{e}</pre>"
                     f"<p>Log completo: {LOG_FILE}</p>"
                     "</body></html>"

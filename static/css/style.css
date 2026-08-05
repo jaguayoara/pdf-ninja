@@ -1,11 +1,11 @@
 ﻿/* ===========================================================
-   Pdf Ninja - Estilos principales
+   PDF Ninja - Estilos principales
    Design system: minimalismo + acentos sutiles
    Tipografia: Inter | Iconos: SVG inline
    =========================================================== */
 
 :root {
-  /* ===== Brand (Pdf Ninja: rojo intenso + acento oscuro) ===== */
+  /* ===== Brand (PDF Ninja: rojo intenso + acento oscuro) ===== */
   --primary: #DC2626;
   --primary-hover: #B91C1C;
   --primary-active: #991B1B;
@@ -275,20 +275,10 @@ a:hover { text-decoration: underline; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px; height: 32px;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-sm);
+  width: 36px; height: 36px;
   position: relative;
 }
-.brand-mark::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.08) inset;
-  pointer-events: none;
-}
-.brand-mark svg { display: block; position: relative; z-index: 1; }
+.brand-mark img { display: block; width: 36px; height: 36px; }
 .brand-name { font-weight: 800; letter-spacing: -0.02em; }
 
 .topnav {
@@ -310,6 +300,18 @@ a:hover { text-decoration: underline; }
   color: var(--text);
   background: var(--bg-subtle);
   text-decoration: none;
+}
+.topnav .github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-soft);
+}
+.topnav .github-link svg { width: 16px; height: 16px; }
+.topnav .github-link:hover { color: var(--text); }
+@media (max-width: 540px) {
+  .topnav .github-text { display: none; }
+  .topnav .github-link { padding: 7px 9px; }
 }
 
 /* Theme toggle */
@@ -1225,6 +1227,90 @@ a:hover { text-decoration: underline; }
   color: var(--text);
 }
 .result-pane a { color: var(--primary); font-weight: 500; }
+
+/* Metadata table (herramienta "Metadatos del PDF") */
+.result-pane h4 {
+  margin: 18px 0 8px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.result-pane h4:first-child { margin-top: 4px; }
+.meta-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  margin-bottom: 4px;
+}
+.meta-table th, .meta-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.meta-table th {
+  width: 38%;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.meta-table td { color: var(--text); word-break: break-word; }
+.meta-table tr:last-child th, .meta-table tr:last-child td { border-bottom: none; }
+.meta-table .muted { color: var(--text-muted); font-style: italic; }
+.meta-table thead th {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-strong);
+}
+.meta-table tbody td code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-overlay);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  color: var(--text);
+}
+.meta-table-preview {
+  color: var(--text-soft);
+  font-size: var(--fs-xs);
+  font-style: italic;
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meta-outline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.meta-outline li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--fs-sm);
+  color: var(--text);
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.meta-outline li:last-child { border-bottom: none; }
+.meta-outline-title { flex: 1; }
+.meta-outline-page {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+}
+.meta-outline-l1 { font-weight: 700; color: var(--primary); }
 
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(8px); }

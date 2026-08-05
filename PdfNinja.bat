@@ -1,5 +1,5 @@
 @echo off
-REM Pdf Ninja - Lanzador de la version portable (.exe).
+REM PDF Ninja - Lanzador de la version portable (.exe).
 REM Si tienes el .exe empaquetado, este .bat es solo una comodidad extra.
 REM Alternativa: doble clic directo en PdfNinja.exe (en dist\PdfNinja\).
 

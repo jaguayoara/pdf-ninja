@@ -1,5 +1,5 @@
 ﻿@echo off
-REM Pdf Ninja - script de inicio para Windows
+REM PDF Ninja - script de inicio para Windows
 setlocal
 
 cd /d "%~dp0"
@@ -32,7 +32,7 @@ if errorlevel 1 (
   REM Modo navegador
   echo.
   echo ============================================================
-  echo   Pdf Ninja iniciando en navegador
+  echo   PDF Ninja iniciando en navegador
   echo   Abre http://127.0.0.1:5050
   echo   Ctrl+C para detener
   echo ============================================================
@@ -43,7 +43,7 @@ if errorlevel 1 (
   REM Modo desktop (ventana nativa)
   echo.
   echo ============================================================
-  echo   Pdf Ninja iniciando como aplicacion de escritorio
+  echo   PDF Ninja iniciando como aplicacion de escritorio
   echo   Una ventana se abrira en breve
   echo   ============================================================
   echo.

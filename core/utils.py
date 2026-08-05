@@ -1,5 +1,5 @@
 ﻿"""
-Utilidades compartidas para Pdf Ninja.
+Utilidades compartidas para PDF Ninja.
 Manejo de archivos, validacion, helpers de paginas/rangos.
 """
 from __future__ import annotations

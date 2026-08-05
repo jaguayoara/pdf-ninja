@@ -1,13 +1,17 @@
 """
 Modulo de manipulacion de PDFs: dividir, fusionar, rotar, comprimir,
 organizar, marca de agua, numeros de pagina, proteger/desproteger.
+Tambien expone extractores de metadatos para PDF, Word, Excel,
+PowerPoint, imagenes y texto.
 """
 from __future__ import annotations
 
 import io
 import math
+import re
+import zipfile
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import fitz  # PyMuPDF
 import pikepdf
@@ -370,6 +374,7 @@ def pdf_info(pdf_path: Path) -> dict:
         meta = doc.metadata or {}
         size = pdf_path.stat().st_size
         return {
+            "kind": "pdf",
             "pages": doc.page_count,
             "metadata": {k: str(v) for k, v in meta.items() if v},
             "encrypted": doc.is_encrypted,
@@ -383,3 +388,429 @@ def pdf_info(pdf_path: Path) -> dict:
         }
     finally:
         doc.close()
+
+
+# --- Info de documentos (multi-formato) --------------------------------
+
+# Tipos de documento soportados por document_info().
+DOC_KINDS = ("pdf", "docx", "xlsx", "pptx", "image", "text")
+
+# Mapeo extension -> kind (Office Open XML y formatos comunes).
+_EXT_TO_KIND = {
+    ".pdf": "pdf",
+    ".docx": "docx",
+    ".docm": "docx",
+    ".dotx": "docx",
+    ".xlsx": "xlsx",
+    ".xlsm": "xlsx",
+    ".xltx": "xlsx",
+    ".pptx": "pptx",
+    ".pptm": "pptx",
+    ".potx": "pptx",
+    ".png": "image", ".jpg": "image", ".jpeg": "image",
+    ".webp": "image", ".gif": "image", ".bmp": "image",
+    ".tif": "image", ".tiff": "image",
+    ".txt": "text", ".md": "text", ".csv": "text", ".log": "text",
+}
+
+# Tags EXIF utiles para mostrar en la UI.
+_EXIF_LABELS = {
+    0x010F: "Fabricante",
+    0x0110: "Modelo",
+    0x0112: "Orientacion",
+    0x011A: "XResolution",
+    0x011B: "YResolution",
+    0x0131: "Software",
+    0x0132: "Fecha",
+    0x9003: "Fecha original",
+    0x9004: "Fecha digitalizacion",
+    0x8825: "GPSInfo",
+}
+
+
+def detect_doc_kind(path: Path) -> str:
+    """Detecta el tipo de documento a partir de la extension."""
+    return _EXT_TO_KIND.get(path.suffix.lower(), "unknown")
+
+
+def _common_envelope(path: Path, kind: str) -> Dict[str, Any]:
+    """Campos comunes a todos los extractores (nombre, tamano, tipo)."""
+    size = path.stat().st_size
+    return {
+        "kind": kind,
+        "filename": path.name,
+        "size_bytes": size,
+        "size_human": utils.human_size(size),
+    }
+
+
+# --- OOXML: docx, xlsx, pptx (metadata viene en docProps/*.xml) --------
+
+_OOXML_NS_CORE = {
+    "cp": "http://schemas.openxmlformats.org/package/2006/metadata/core-properties",
+    "dc": "http://purl.org/dc/elements/1.1/",
+    "dcterms": "http://purl.org/dc/terms/",
+    "xsi": "http://www.w3.org/2001/XMLSchema-instance",
+}
+_OOXML_NS_APP = {
+    "ep": "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties",
+}
+
+
+def _read_ooxml_core(path: Path) -> Dict[str, str]:
+    """Lee docProps/core.xml (title, author, created, etc.) de un OOXML."""
+    out: Dict[str, str] = {}
+    try:
+        with zipfile.ZipFile(path) as z:
+            with z.open("docProps/core.xml") as f:
+                import xml.etree.ElementTree as ET
+                root = ET.parse(f).getroot()
+        for qname, label in (
+            ("dc:title", "title"), ("dc:subject", "subject"),
+            ("dc:creator", "creator"), ("cp:keywords", "keywords"),
+            ("dc:description", "description"), ("cp:lastModifiedBy", "lastModifiedBy"),
+            ("cp:revision", "revision"), ("cp:category", "category"),
+            ("cp:contentStatus", "contentStatus"),
+        ):
+            ns_prefix, tag = qname.split(":")
+            ns = _OOXML_NS_CORE[ns_prefix]
+            el = root.find(f"{{{ns}}}{tag}")
+            if el is not None and el.text:
+                out[label] = el.text
+        # Fechas (vienen como xsd:dateTime en dcterms:created/modified)
+        for qname, label in (
+            ("dcterms:created", "created"), ("dcterms:modified", "modified"),
+        ):
+            ns_prefix, tag = qname.split(":")
+            ns = _OOXML_NS_CORE[ns_prefix]
+            el = root.find(f"{{{ns}}}{tag}")
+            if el is not None and el.text:
+                out[label] = el.text
+    except (KeyError, zipfile.BadZipFile, ET.ParseError):
+        pass
+    return out
+
+
+def _read_ooxml_app(path: Path) -> Dict[str, str]:
+    """Lee docProps/app.xml (Application, Pages, Words, etc.) de un OOXML."""
+    out: Dict[str, str] = {}
+    try:
+        with zipfile.ZipFile(path) as z:
+            with z.open("docProps/app.xml") as f:
+                import xml.etree.ElementTree as ET
+                root = ET.parse(f).getroot()
+        ns = _OOXML_NS_APP["ep"]
+        for tag in (
+            "Application", "AppVersion", "Template",
+            "Company", "Manager", "TotalTime",
+            "Pages", "Words", "Characters", "CharactersWithSpaces",
+            "Lines", "Paragraphs", "Slides", "Notes",
+            "HiddenSlides", "MMClips", "ScaleCrop",
+            "PresentationFormat", "DocSecurity",
+        ):
+            el = root.find(f"{{{ns}}}{tag}")
+            if el is not None and el.text:
+                out[tag] = el.text
+    except (KeyError, zipfile.BadZipFile, ET.ParseError):
+        pass
+    return out
+
+
+# --- Word (.docx) -------------------------------------------------------
+
+def _docx_info(path: Path) -> Dict[str, Any]:
+    """Metadatos de un .docx. Cuenta tablas, parrafos, palabras, etc."""
+    info = _common_envelope(path, "docx")
+    core = _read_ooxml_core(path)
+    app = _read_ooxml_app(path)
+    info["metadata"] = core
+    info["app"] = {k: v for k, v in app.items() if k not in ("Template",)}
+
+    # Contar tablas y dar dimensiones leyendo word/document.xml
+    tables: List[Dict[str, Any]] = []
+    para_count = 0
+    word_count = 0
+    try:
+        with zipfile.ZipFile(path) as z:
+            with z.open("word/document.xml") as f:
+                import xml.etree.ElementTree as ET
+                root = ET.parse(f).getroot()
+        ns_w = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+        for i, tbl in enumerate(root.iter(f"{ns_w}tbl"), start=1):
+            rows = tbl.findall(f"{ns_w}tr")
+            row_count = len(rows)
+            col_count = max((len(r.findall(f"{ns_w}tc")) for r in rows), default=0)
+            preview = ""
+            for r in rows[:2]:
+                cell_text = " ".join(
+                    (t.text or "") for t in r.iter(f"{ns_w}t") if t.text
+                ).strip()
+                if cell_text:
+                    preview = cell_text[:80]
+                    break
+            tables.append({
+                "index": i,
+                "rows": row_count,
+                "cols": col_count,
+                "preview": preview,
+            })
+        para_count = sum(1 for _ in root.iter(f"{ns_w}p"))
+        word_count = sum(
+            len((t.text or "").split())
+            for t in root.iter(f"{ns_w}t")
+            if t.text
+        )
+    except (KeyError, zipfile.BadZipFile, ET.ParseError):
+        pass
+    info["tables"] = tables
+    info["stats"] = {
+        "paragraphs": para_count,
+        "words": word_count,
+        "tables": len(tables),
+    }
+    return info
+
+
+# --- Excel (.xlsx) ------------------------------------------------------
+
+def _xlsx_info(path: Path) -> Dict[str, Any]:
+    """Metadatos de un .xlsx. Lista hojas, sus dimensiones y nombres definidos."""
+    info = _common_envelope(path, "xlsx")
+    core = _read_ooxml_core(path)
+    app = _read_ooxml_app(path)
+    info["metadata"] = core
+    info["app"] = {k: v for k, v in app.items() if k not in ("Template",)}
+
+    sheets: List[Dict[str, Any]] = []
+    total_cells = 0
+    defined_names: List[Dict[str, str]] = []
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        try:
+            for ws in wb.worksheets:
+                min_col, min_row = ws.min_column, ws.min_row
+                max_col, max_row = ws.max_column, ws.max_row
+                if max_col is None or max_row is None:
+                    sheets.append({"name": ws.title, "rows": 0, "cols": 0,
+                                   "cells": 0, "tables": 0, "note": "Hoja vacia"})
+                    continue
+                rows = max_row - min_row + 1
+                cols = max_col - min_col + 1
+                # "Tablas" en Excel: usamos el termino "bloques" para no
+                # confundir con Excel Tables (que requieren formato especial).
+                # Aqui cada hoja se considera un bloque; reportamos dimensiones.
+                cells = sum(1 for row in ws.iter_rows() for c in row if c.value is not None)
+                total_cells += cells
+                sheets.append({
+                    "name": ws.title,
+                    "rows": rows,
+                    "cols": cols,
+                    "cells": cells,
+                    "tables": 0,  # Excel Tables (ListObjects) requieren inspeccion aparte
+                    "state": ws.sheet_state,
+                })
+            for dn in wb.defined_names:
+                try:
+                    dests = list(wb.defined_names[dn].destinations) if dn in wb.defined_names else []
+                except Exception:
+                    dests = []
+                defined_names.append({"name": dn, "destinations": str(dests)[:200]})
+        finally:
+            wb.close()
+    except Exception as e:  # noqa: BLE001 - openpyxl lanza varios tipos
+        info.setdefault("warnings", []).append(f"No se pudo abrir con openpyxl: {e}")
+    info["sheets"] = sheets
+    info["defined_names"] = defined_names[:50]  # cap
+    info["stats"] = {
+        "sheets": len(sheets),
+        "cells_with_value": total_cells,
+        "defined_names": len(defined_names),
+    }
+    return info
+
+
+# --- PowerPoint (.pptx) -------------------------------------------------
+
+def _pptx_info(path: Path) -> Dict[str, Any]:
+    """Metadatos de un .pptx. Cuenta slides y tablas por slide."""
+    info = _common_envelope(path, "pptx")
+    core = _read_ooxml_core(path)
+    app = _read_ooxml_app(path)
+    info["metadata"] = core
+    info["app"] = {k: v for k, v in app.items() if k not in ("Template",)}
+
+    slides: List[Dict[str, Any]] = []
+    total_tables = 0
+    slide_w = slide_h = None
+    try:
+        with zipfile.ZipFile(path) as z:
+            names = z.namelist()
+            slide_names = sorted(
+                [n for n in names if re.match(r"ppt/slides/slide\d+\.xml$", n)],
+                key=lambda s: int(re.search(r"slide(\d+)\.xml$", s).group(1)),
+            )
+            for sn in slide_names:
+                idx = int(re.search(r"slide(\d+)\.xml$", sn).group(1))
+                with z.open(sn) as f:
+                    import xml.etree.ElementTree as ET
+                    root = ET.parse(f).getroot()
+                ns_a = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+                tables = list(root.iter(f"{ns_a}tbl"))
+                total_tables += len(tables)
+                table_dims = []
+                for t in tables:
+                    rows = t.findall(f"{ns_a}tr")
+                    cols = max((len(r.findall(f"{ns_a}tc")) for r in rows), default=0)
+                    table_dims.append({"rows": len(rows), "cols": cols})
+                slides.append({
+                    "index": idx,
+                    "tables": len(tables),
+                    "table_dims": table_dims,
+                })
+            # Tamano de la presentacion (EMU -> cm: /360000)
+            if "ppt/presentation.xml" in names:
+                with z.open("ppt/presentation.xml") as f:
+                    import xml.etree.ElementTree as ET
+                    root = ET.parse(f).getroot()
+                ns_p = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+                sld = root.find(f"{ns_p}sldSz")
+                if sld is not None:
+                    cx = int(sld.get("cx", 0))
+                    cy = int(sld.get("cy", 0))
+                    if cx and cy:
+                        slide_w = round(cx / 360000, 2)
+                        slide_h = round(cy / 360000, 2)
+    except (KeyError, zipfile.BadZipFile, ET.ParseError):
+        pass
+    info["slides"] = slides
+    info["stats"] = {
+        "slides": len(slides),
+        "tables": total_tables,
+        "slide_w_cm": slide_w,
+        "slide_h_cm": slide_h,
+    }
+    return info
+
+
+# --- Imagenes (png, jpg, webp, etc.) ------------------------------------
+
+def _image_info(path: Path) -> Dict[str, Any]:
+    """Metadatos de una imagen: tamano, formato, modo, EXIF basico."""
+    info = _common_envelope(path, "image")
+    try:
+        with Image.open(path) as im:
+            info["format"] = im.format
+            info["mode"] = im.mode
+            info["width"] = im.width
+            info["height"] = im.height
+            info["megapixels"] = round((im.width * im.height) / 1_000_000, 2)
+            dpi = im.info.get("dpi")
+            if dpi:
+                info["dpi"] = f"{int(dpi[0])} x {int(dpi[1])}" if len(dpi) == 2 else str(dpi)
+            # EXIF
+            exif = {}
+            try:
+                raw = im.getexif()
+                if raw:
+                    for tag_id, val in raw.items():
+                        label = _EXIF_LABELS.get(tag_id)
+                        if not label:
+                            continue
+                        # Decodifica bytes para legibilidad
+                        if isinstance(val, bytes):
+                            try:
+                                val = val.decode("utf-8", errors="replace").strip("\x00").strip()
+                            except Exception:
+                                val = repr(val)
+                        exif[label] = str(val)[:200]
+            except Exception:
+                pass
+            if exif:
+                info["exif"] = exif
+            info["stats"] = {
+                "ancho": im.width,
+                "alto": im.height,
+                "megapixeles": info["megapixels"],
+                "modo": im.mode,
+            }
+    except Exception as e:  # noqa: BLE001
+        info["error"] = f"No se pudo abrir la imagen: {e}"
+    return info
+
+
+# --- Texto plano --------------------------------------------------------
+
+def _text_info(path: Path) -> Dict[str, Any]:
+    """Metadatos de un .txt/.md/.csv: encoding, lineas, palabras, caracteres."""
+    info = _common_envelope(path, "text")
+    raw = path.read_bytes()
+    # Intentar decodificar con UTF-8 primero, fallback a latin-1 (nunca falla)
+    encoding = "utf-8"
+    text = None
+    for enc in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            text = raw.decode(enc)
+            encoding = enc
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        text = raw.decode("utf-8", errors="replace")
+        encoding = "utf-8 (con reemplazos)"
+    lines = text.count("\n") + (0 if text.endswith("\n") else 1)
+    words = len(text.split())
+    chars = len(text)
+    chars_no_ws = len(re.sub(r"\s", "", text))
+    # Para CSV: contar columnas (separador mas comun)
+    extra = {}
+    if path.suffix.lower() == ".csv":
+        sample = text[:4096]
+        for sep in (",", ";", "\t", "|"):
+            counts = [line.count(sep) for line in sample.splitlines()[:10] if line]
+            if counts and max(counts) == min(counts) and max(counts) > 0:
+                extra["separador"] = sep
+                extra["columnas"] = max(counts) + 1
+                break
+    info["encoding"] = encoding
+    info["stats"] = {
+        "lineas": lines,
+        "palabras": words,
+        "caracteres": chars,
+        "caracteres_sin_espacios": chars_no_ws,
+    }
+    if extra:
+        info["stats"].update(extra)
+    return info
+
+
+# --- Dispatcher ---------------------------------------------------------
+
+def document_info(path: Path) -> Dict[str, Any]:
+    """
+    Punto de entrada unico: detecta el tipo de archivo y devuelve su
+    metadata normalizada en un dict. La UI consume el campo 'kind' para
+    decidir como renderizar.
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"No existe: {path}")
+    if path.stat().st_size == 0:
+        raise ValueError("Archivo vacio")
+    kind = detect_doc_kind(path)
+    if kind == "pdf":
+        return pdf_info(path)
+    if kind == "docx":
+        return _docx_info(path)
+    if kind == "xlsx":
+        return _xlsx_info(path)
+    if kind == "pptx":
+        return _pptx_info(path)
+    if kind == "image":
+        return _image_info(path)
+    if kind == "text":
+        return _text_info(path)
+    raise ValueError(
+        f"Formato no soportado: {path.suffix or '(sin extension)'}. "
+        f"Soportados: PDF, Word (.docx), Excel (.xlsx), "
+        f"PowerPoint (.pptx), imagenes, texto."
+    )

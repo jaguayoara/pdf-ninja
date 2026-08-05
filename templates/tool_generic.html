@@ -72,6 +72,7 @@
     multiple: {{ 'true' if multiple else 'false' }},
     fileTypes: {{ (file_types or 'pdf')|tojson }},
     extraFields: {{ (extra_fields or [])|tojson }},
+    responseKind: {{ (response_kind or 'download')|tojson }},
   };
 </script>
 <script src="{{ url_for('static', filename='js/tools.js') }}"></script>

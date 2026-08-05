@@ -1,1 +1,1 @@
-﻿"""Pdf Ninja core package."""
+﻿"""PDF Ninja core package."""

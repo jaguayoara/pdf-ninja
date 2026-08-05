@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-Pdf Ninja - PyInstaller spec.
+PDF Ninja - PyInstaller spec.
 
 Empaqueta desktop.py + Flask backend + todos los assets en un ejecutable
 Windows portable. Modo onedir para arranque rapido (PyMuPDF y pdf2docx

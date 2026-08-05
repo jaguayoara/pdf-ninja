@@ -1,5 +1,5 @@
 /* ===========================================================
-   Pdf Ninja - JavaScript principal (toast, helpers, drop zone, theme)
+   PDF Ninja - JavaScript principal (toast, helpers, drop zone, theme)
    =========================================================== */
 
 (function initTheme() {

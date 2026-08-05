@@ -1,5 +1,5 @@
 ﻿/* ===========================================================
-   Pdf Ninja - JS para la pagina generica de herramienta
+   PDF Ninja - JS para la pagina generica de herramienta
    Lee window.TOOL_CONFIG (inyectado por el template) y configura
    el drop zone + envio segun el slug.
    =========================================================== */
@@ -51,9 +51,10 @@
     if (n.endsWith('.pdf')) return 'PDF';
     if (n.match(/\.(png|jpg|jpeg)$/)) return 'IMG';
     if (n.match(/\.(webp|bmp|tiff|gif)$/)) return 'IMG';
-    if (n.endsWith('.docx')) return 'DOC';
-    if (n.endsWith('.xlsx')) return 'XLS';
-    if (n.endsWith('.txt')) return 'TXT';
+    if (n.match(/\.docx?$/)) return 'DOC';
+    if (n.match(/\.xlsx?$/)) return 'XLS';
+    if (n.match(/\.pptx?$/)) return 'PPT';
+    if (n.match(/\.(txt|md|csv|log)$/)) return 'TXT';
     return 'FILE';
   }
 
@@ -132,6 +133,236 @@
     if (resultPane) resultPane.hidden = true;
   }
 
+  // Formatea un valor de metadata para mostrar (string vacio -> "—")
+  function fmtVal(v) {
+    if (v == null) return '—';
+    const s = String(v).trim();
+    return s === '' ? '—' : escapeHtml(s);
+  }
+
+  function fmtDate(s) {
+    if (!s) return null;
+    // ISO 8601 -> mostrar legible
+    try {
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return escapeHtml(String(s));
+      return escapeHtml(d.toLocaleString('es-CL'));
+    } catch {
+      return escapeHtml(String(s));
+    }
+  }
+
+  function rowsFrom(obj, labels) {
+    return Object.entries(obj || {}).map(([k, v]) =>
+      `<tr><th>${escapeHtml(labels[k] || k)}</th><td>${fmtVal(v)}</td></tr>`
+    ).join('');
+  }
+
+  // Render especifico para respuestas JSON (herramienta de metadatos).
+  // Soporta multiples tipos: pdf, docx, xlsx, pptx, image, text.
+  function renderJsonResult(data) {
+    if (!data || !data.ok || !data.info) {
+      return '<p class="muted">Sin datos.</p>';
+    }
+    const info = data.info;
+    const kind = info.kind || 'pdf';
+
+    // Bloque "Informacion general" comun a todos
+    const kindLabel = {
+      pdf: 'PDF', docx: 'Word', xlsx: 'Excel',
+      pptx: 'PowerPoint', image: 'Imagen', text: 'Texto',
+    }[kind] || kind.toUpperCase();
+    const main = [
+      ['Tipo', kindLabel],
+      ['Nombre del archivo', fmtVal(info.filename)],
+      ['Tamano', fmtVal(info.size_human)],
+      ['Tamano (bytes)', fmtVal(info.size_bytes)],
+    ];
+    const mainHtml = `<table class="meta-table">${main.map(([k,v]) =>
+      `<tr><th>${escapeHtml(k)}</th><td>${v}</td></tr>`).join('')}</table>`;
+
+    // Labels amigables para campos de metadatos
+    const metaLabels = {
+      title: 'Titulo', author: 'Autor', subject: 'Asunto',
+      keywords: 'Palabras clave', creator: 'Creador', producer: 'Productor',
+      creationDate: 'Fecha de creacion', modDate: 'Fecha de modificacion',
+      trapped: 'Trapped', description: 'Descripcion',
+      lastModifiedBy: 'Ultima edicion por', revision: 'Revision',
+      category: 'Categoria', contentStatus: 'Estado',
+      created: 'Fecha de creacion', modified: 'Ultima modificacion',
+      format: 'Formato', company: 'Empresa', manager: 'Responsable',
+      application: 'Aplicacion', appVersion: 'Version de la app',
+      totalTime: 'Tiempo total de edicion', pages: 'Paginas',
+      words: 'Palabras', characters: 'Caracteres',
+      charactersWithSpaces: 'Caracteres (con espacios)',
+      lines: 'Lineas', paragraphs: 'Parrafos', slides: 'Slides',
+      notes: 'Notas', hiddenSlides: 'Slides ocultas',
+    };
+
+    const meta = info.metadata || {};
+    const metaHtml = meta && Object.keys(meta).length
+      ? `<table class="meta-table">${rowsFrom(meta, metaLabels)}</table>`
+      : '<p class="muted">El documento no expone metadatos estandar.</p>';
+
+    // App (Application, AppVersion, etc. — comun a docx/xlsx/pptx)
+    let appHtml = '';
+    const app = info.app || {};
+    if (Object.keys(app).length) {
+      appHtml = `<h4>Datos de la aplicacion</h4><table class="meta-table">${rowsFrom(app, metaLabels)}</table>`;
+    }
+
+    // Render especifico por tipo
+    let typeSpecific = '';
+    if (kind === 'pdf') {
+      const encrypted = info.encrypted ? 'Si' : 'No';
+      typeSpecific = `
+        <h4>Contenido</h4>
+        <table class="meta-table">
+          <tr><th>Paginas</th><td>${fmtVal(info.pages)}</td></tr>
+          <tr><th>Cifrado</th><td>${encrypted}</td></tr>
+        </table>
+        <h4>Indice (TOC) &mdash; ${(info.outline||[]).length} entrada(s)</h4>
+        ${renderOutline(info.outline || [])}
+      `;
+    } else if (kind === 'docx') {
+      const s = info.stats || {};
+      typeSpecific = `
+        <h4>Contenido &mdash; Word</h4>
+        <table class="meta-table">
+          <tr><th>Parrafos</th><td>${fmtVal(s.paragraphs)}</td></tr>
+          <tr><th>Palabras</th><td>${fmtVal(s.words)}</td></tr>
+          <tr><th>Tablas</th><td>${fmtVal(s.tables)}</td></tr>
+        </table>
+        <h4>Tablas del documento &mdash; ${(info.tables||[]).length}</h4>
+        ${renderTables(info.tables || [])}
+      `;
+    } else if (kind === 'xlsx') {
+      const s = info.stats || {};
+      typeSpecific = `
+        <h4>Contenido &mdash; Excel</h4>
+        <table class="meta-table">
+          <tr><th>Hojas</th><td>${fmtVal(s.sheets)}</td></tr>
+          <tr><th>Celdas con valor</th><td>${fmtVal(s.cells_with_value)}</td></tr>
+          <tr><th>Nombres definidos</th><td>${fmtVal(s.defined_names)}</td></tr>
+        </table>
+        <h4>Hojas &mdash; ${(info.sheets||[]).length}</h4>
+        ${renderSheets(info.sheets || [])}
+        ${(info.defined_names||[]).length ? `<h4>Nombres definidos &mdash; ${info.defined_names.length}</h4>${renderDefinedNames(info.defined_names)}` : ''}
+      `;
+    } else if (kind === 'pptx') {
+      const s = info.stats || {};
+      const slideSize = s.slide_w_cm && s.slide_h_cm
+        ? `${s.slide_w_cm} x ${s.slide_h_cm} cm`
+        : '—';
+      typeSpecific = `
+        <h4>Contenido &mdash; PowerPoint</h4>
+        <table class="meta-table">
+          <tr><th>Slides</th><td>${fmtVal(s.slides)}</td></tr>
+          <tr><th>Tablas</th><td>${fmtVal(s.tables)}</td></tr>
+          <tr><th>Tamano de slide</th><td>${slideSize}</td></tr>
+        </table>
+        <h4>Slides &mdash; ${(info.slides||[]).length}</h4>
+        ${renderSlides(info.slides || [])}
+      `;
+    } else if (kind === 'image') {
+      const s = info.stats || {};
+      typeSpecific = `
+        <h4>Contenido &mdash; Imagen</h4>
+        <table class="meta-table">
+          <tr><th>Formato</th><td>${fmtVal(info.format)}</td></tr>
+          <tr><th>Modo de color</th><td>${fmtVal(info.mode)}</td></tr>
+          <tr><th>Dimensiones</th><td>${fmtVal(s.ancho)} x ${fmtVal(s.alto)} px</td></tr>
+          <tr><th>Megapixeles</th><td>${fmtVal(s.megapixeles)}</td></tr>
+          ${info.dpi ? `<tr><th>DPI</th><td>${fmtVal(info.dpi)}</td></tr>` : ''}
+        </table>
+        ${info.exif && Object.keys(info.exif).length
+          ? `<h4>Metadatos EXIF &mdash; ${Object.keys(info.exif).length}</h4><table class="meta-table">${rowsFrom(info.exif, {})}</table>`
+          : ''}
+      `;
+    } else if (kind === 'text') {
+      const s = info.stats || {};
+      typeSpecific = `
+        <h4>Contenido &mdash; Texto</h4>
+        <table class="meta-table">
+          <tr><th>Encoding</th><td>${fmtVal(info.encoding)}</td></tr>
+          <tr><th>Lineas</th><td>${fmtVal(s.lineas)}</td></tr>
+          <tr><th>Palabras</th><td>${fmtVal(s.palabras)}</td></tr>
+          <tr><th>Caracteres</th><td>${fmtVal(s.caracteres)}</td></tr>
+          <tr><th>Caracteres (sin espacios)</th><td>${fmtVal(s.caracteres_sin_espacios)}</td></tr>
+          ${s.separador ? `<tr><th>Separador CSV</th><td>${escapeHtml(s.separador)}</td></tr>` : ''}
+          ${s.columnas ? `<tr><th>Columnas (CSV)</th><td>${fmtVal(s.columnas)}</td></tr>` : ''}
+        </table>
+      `;
+    }
+
+    return `<h4>Informacion general</h4>${mainHtml}<h4>Metadatos</h4>${metaHtml}${appHtml}${typeSpecific}`;
+  }
+
+  function renderOutline(outline) {
+    if (!outline.length) {
+      return '<p class="muted">El PDF no tiene un indice (tabla de contenido) navegable.</p>';
+    }
+    return `<ol class="meta-outline">${outline.map(item => {
+      const lvl = Math.min(item.level || 1, 4);
+      return `<li><span class="meta-outline-l${lvl}">${'— '.repeat(Math.max(0, (item.level || 1) - 1))}</span><span class="meta-outline-title">${fmtVal(item.title)}</span><span class="meta-outline-page">p. ${fmtVal(item.page)}</span></li>`;
+    }).join('')}</ol>`;
+  }
+
+  function renderTables(tables) {
+    if (!tables.length) {
+      return '<p class="muted">El documento no contiene tablas.</p>';
+    }
+    return `<table class="meta-table">
+      <thead><tr><th>#</th><th>Filas</th><th>Columnas</th><th>Vista previa</th></tr></thead>
+      <tbody>${tables.map(t => `<tr>
+        <td>${t.index}</td>
+        <td>${fmtVal(t.rows)}</td>
+        <td>${fmtVal(t.cols)}</td>
+        <td class="meta-table-preview">${fmtVal(t.preview)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  function renderSheets(sheets) {
+    if (!sheets.length) {
+      return '<p class="muted">El archivo no contiene hojas.</p>';
+    }
+    return `<table class="meta-table">
+      <thead><tr><th>Hoja</th><th>Filas</th><th>Columnas</th><th>Celdas con valor</th><th>Estado</th></tr></thead>
+      <tbody>${sheets.map(s => `<tr>
+        <td><strong>${fmtVal(s.name)}</strong></td>
+        <td>${fmtVal(s.rows)}</td>
+        <td>${fmtVal(s.cols)}</td>
+        <td>${fmtVal(s.cells)}</td>
+        <td>${fmtVal(s.state)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  function renderDefinedNames(names) {
+    return `<table class="meta-table">
+      <thead><tr><th>Nombre</th><th>Destino</th></tr></thead>
+      <tbody>${names.map(n => `<tr>
+        <td><code>${fmtVal(n.name)}</code></td>
+        <td>${fmtVal(n.destinations)}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
+  function renderSlides(slides) {
+    if (!slides.length) {
+      return '<p class="muted">La presentacion no contiene slides.</p>';
+    }
+    return `<table class="meta-table">
+      <thead><tr><th>#</th><th>Tablas en el slide</th><th>Dimensiones (filas x cols)</th></tr></thead>
+      <tbody>${slides.map(s => `<tr>
+        <td>${s.index}</td>
+        <td>${fmtVal(s.tables)}</td>
+        <td>${(s.table_dims || []).map(d => `${d.rows}x${d.cols}`).join(', ') || '—'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+
   // Click en procesar
   if (actionBtn) {
     actionBtn.addEventListener('click', async () => {
@@ -167,6 +398,16 @@
             if (j && j.error) msg = j.error;
           } catch {}
           throw new Error(msg);
+        }
+
+        // Herramientas de tipo "json" devuelven datos para mostrar en pantalla
+        // (no descargan un archivo). Por ejemplo: metadata del PDF.
+        if (cfg.responseKind === 'json') {
+          const data = await res.json();
+          showResult(renderJsonResult(data));
+          setStatus('Completado', 'success');
+          PdfNinja.toast('Inspeccion completada', 'success');
+          return;
         }
 
         // Detectar tipo de salida por Content-Disposition o content-type

@@ -29,6 +29,19 @@ test*.pdf
 test*.png
 test*.docx
 test*.xlsx
+test*.pptx
+test*.txt
+test*.csv
 test*.zip
+test*.js
+test*.py
+debug_*.py
+smoke_test.py
+test_endpoint.py
+test_all_kinds.py
+debug_crop.png
 test_outputs/
 test_protected.pdf
+# Banneres de prueba (versionados aparte cuando se decida)
+logo2.png
+PdfNinja-windows.zip

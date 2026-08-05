@@ -1,5 +1,5 @@
 """
-Regenera el branding grafico de Pdf Ninja usando la imagen de
+Regenera el branding grafico de PDF Ninja usando la imagen de
 Gemini (ninja con shuriken y PDFs).
 
 Genera:

@@ -1,5 +1,5 @@
 @echo off
-REM Pdf Ninja - Empaqueta el .exe portable con PyInstaller.
+REM PDF Ninja - Empaqueta el .exe portable con PyInstaller.
 REM Resultado: dist\Pdf Ninja\Pdf Ninja.exe + dist\Pdf Ninja\_internal\
 REM Para distribuir: comprimir la carpeta dist\Pdf Ninja\ en un .zip.
 
@@ -27,7 +27,7 @@ if errorlevel 1 (
 
 echo.
 echo ============================================================
-echo   Empaquetando Pdf Ninja (esto puede tardar varios minutos)
+echo   Empaquetando PDF Ninja (esto puede tardar varios minutos)
 echo ============================================================
 echo.
 

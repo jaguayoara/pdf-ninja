@@ -105,6 +105,9 @@
   ("protect", "Proteger PDF", "Cifrar con contraseña (AES-256)", "P"),
   ("unlock", "Desproteger PDF", "Quita la contraseña del PDF", "Q"),
 ] %}
+{% set inspect_tools = [
+  ("metadata", "Metadatos del documento", "PDF, Word, Excel, PPT, imagenes, txt", "I"),
+] %}
 
 <section class="tool-groups">
   <!-- Conversiones con bento (featured = PDF a Word) -->
@@ -182,6 +185,24 @@
       {% endfor %}
     </div>
   </div>
+
+  <!-- Inspeccionar -->
+  <div class="tool-group">
+    <h2 class="group-title">Inspeccionar</h2>
+    <div class="tool-grid">
+      {% for slug, name, desc, mark in inspect_tools %}
+      {% set meta = tool_icons[slug] or ('circle', 't-slate') %}
+      <a class="tool-card" href="{{ url_for('tool', slug=slug) }}" data-name="{{ name|lower }} {{ desc|lower }} {{ slug }}">
+        <div class="tool-icon {{ meta[1] }}">{{ icons[meta[0]]|safe }}</div>
+        <div class="tool-body">
+          <div class="tool-name">{{ name }}</div>
+          <div class="tool-desc">{{ desc|safe }}</div>
+        </div>
+        <div class="tool-arrow" aria-hidden="true">{{ icons['arrow-right']|safe }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
 </section>
 
 <section class="features">
@@ -197,7 +218,7 @@
   </div>
   <div class="feature">
     <div class="feature-icon" style="color: var(--icon-blue);">{{ icons['file-text']|safe }}</div>
-    <h3>+15 herramientas</h3>
+    <h3>+16 herramientas</h3>
     <p>Convertir, fusionar, dividir, proteger... todo incluido.</p>
   </div>
   <div class="feature">

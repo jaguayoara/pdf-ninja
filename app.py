@@ -1,5 +1,5 @@
 """
-Pdf Ninja - Aplicacion Flask principal.
+PDF Ninja - Aplicacion Flask principal.
 Sirve la UI y expone una API REST para todas las herramientas PDF.
 Ejecutar: python app.py
 Luego abre http://127.0.0.1:5050 en el navegador.
@@ -392,6 +392,17 @@ TOOL_CATALOG = {
         """,
         "extra_fields": ["password"],
     },
+    "metadata": {
+        "icon": "ℹ️", "title": "Metadatos del documento",
+        "description": "Inspecciona la ficha tecnica de un PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), imagen o texto: titulo, autor, programa que lo creo, fechas, paginas/hojas/slides, tablas y mas.",
+        "endpoint": "/api/info",
+        "multiple": False, "file_types": "document",
+        "action_label": "Inspeccionar metadatos",
+        "drop_sub": "o haz clic para seleccionar un documento (PDF, Word, Excel, PPT, imagen, txt)",
+        "drop_title": "Arrastra tu documento aqui",
+        "hint": "Soportado: PDF, .docx, .xlsx, .pptx, .png/.jpg/.webp, .txt/.md/.csv",
+        "response_kind": "json",
+    },
 }
 
 
@@ -403,6 +414,14 @@ def tool(slug):
     accept_map = {
         "pdf": ".pdf,application/pdf",
         "image": "image/*",
+        "document": (
+            ".pdf,.docx,.xlsx,.pptx,.txt,.md,.csv,"
+            "application/pdf,"
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document,"
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation,"
+            "text/plain,text/markdown,text/csv,image/*"
+        ),
     }
     return render_template(
         "tool_generic.html",
@@ -420,6 +439,7 @@ def tool(slug):
         drop_title=cfg.get("drop_title", "Arrastra tu archivo aquí"),
         drop_sub=cfg.get("drop_sub", "o haz clic para seleccionar"),
         hint=cfg.get("hint", ""),
+        response_kind=cfg.get("response_kind", "download"),
     )
 
 
@@ -434,7 +454,7 @@ def api_info():
         if not f:
             return _err("Falta el archivo 'file'")
         path = _save_upload(f)
-        info = manipulator.pdf_info(path)
+        info = manipulator.document_info(path)
         return jsonify({"ok": True, "info": info})
     except Exception as e:
         log.exception("info")
@@ -1028,10 +1048,10 @@ def main():
     port = int(os.environ.get("PDFTOOL_PORT", "5050"))
     host = os.environ.get("PDFTOOL_HOST", "127.0.0.1")
     url = f"http://{host}:{port}"
-    log.info("Pdf Ninja iniciando en %s", url)
+    log.info("PDF Ninja iniciando en %s", url)
     print()
     print("=" * 60)
-    print(f"  Pdf Ninja - servidor local")
+    print(f"  PDF Ninja - servidor local")
     print(f"  Abre en tu navegador: {url}")
     print("  Ctrl+C para detener")
     print("=" * 60)

@@ -1,4 +1,4 @@
-﻿"""Script de smoke-testing de los endpoints de Pdf Ninja."""
+﻿"""Script de smoke-testing de los endpoints de PDF Ninja."""
 import io
 import os
 import sys

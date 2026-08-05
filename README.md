@@ -1,8 +1,8 @@
 ﻿<p align="center">
-  <img src="static/banner.png" alt="Pdf Ninja - Herramienta PDF local" width="100%">
+  <img src="static/banner.png" alt="PDF Ninja - Herramienta PDF local" width="100%">
 </p>
 
-<h1 align="center">Pdf Ninja</h1>
+<h1 align="center">PDF Ninja</h1>
 
 <p align="center">
   <strong>Suite de herramientas PDF profesional, completa y 100% local.</strong><br>
@@ -44,7 +44,7 @@
 - **Proteger** con contrasena (AES-256)
 - **Desproteger** PDF cifrado
 
-## Por que Pdf Ninja
+## Por que PDF Ninja
 
 - **Privacidad total** — todo se procesa en tu computador. No hay servidor remoto, no se envian archivos a internet.
 - **Sin cuenta, sin suscripcion, sin telemetría** — instalas y usas.
@@ -54,7 +54,7 @@
 
 ## Modos de ejecucion
 
-Pdf Ninja se puede usar de **tres formas**, segun tus necesidades:
+PDF Ninja se puede usar de **tres formas**, segun tus necesidades:
 
 ### 1. Programa portable (`.exe`) — recomendado
 
@@ -144,7 +144,7 @@ Resultado en `dist\PdfNinja\PdfNinja.exe`.
 ## Estructura del proyecto
 
 ```
-Pdf Ninja/
+PDF Ninja/
 ├── app.py                  # Servidor Flask principal
 ├── desktop.py              # Lanzador ventana nativa (pywebview)
 ├── requirements.txt        # Dependencias Python
